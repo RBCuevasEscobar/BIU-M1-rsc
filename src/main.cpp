@@ -5,6 +5,7 @@
 */
 
 #include "DHTesp.h"
+#include <ArduinoJson.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WebServer.h>
@@ -21,7 +22,7 @@ const char* password = "";
 
 
 // 3. Endpoint de tu API en Azure
-String apiEndpoint = "https://weather-app-portal-e9g0a0dggxbxggfx.westus2-01.azurewebsites.net/";
+String apiEndpoint = "https://weather-app-portal-e9g0a0dggxbxggfx.westus2-01.azurewebsites.net/api/weather/readings";
 
 // 4. Metadatos del sensor
 String cityLocation = "Ciudad de Mexico"; // Ciudad por defecto
@@ -50,6 +51,72 @@ unsigned long lastSendTime = 0;
 // Variables globales para las lecturas
 float temperature, humidity, pressure;
 
+// Declaración de funciones
+void setupWiFi();
+void syncTime();
+void sendDataToApi();
+String getFormattedTime();
+void setupWebServer();
+void handleRoot();
+void handleUpdate();
+void readSensorData();
+
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+  Serial.println("Iniciando Estacion Meteorologica ESP32 (Ciudad de Mexico)...");
+  dhtSensor.setup(DHT_PIN, DHTesp::DHT22);
+
+  Serial.println("Sensor DHT22 inicializado.");
+  
+  setupWiFi();
+  syncTime();
+  setupWebServer();
+  server.begin();
+  Serial.println("Servidor web iniciado. Accede a http://" + WiFi.localIP().toString());
+
+  // Primera lectura inmediata y envio de datos.
+  readSensorData(); 
+
+  // Configura el temporizador para las siguientes lecturas periódicas.
+  lastSendTime = millis();
+}
+
+void loop() {
+  // Maneja las solicitudes del servidor web
+  server.handleClient();
+
+  if (millis() - lastSendTime > SEND_INTERVAL_MS) {
+
+    // Llama a la función para la siguiente lectura de los datos del sensor y envio subsecuente.
+    readSensorData();
+
+ // Restablece el temporizador para la próxima lectura
+    lastSendTime = millis();
+  }
+}
+
+void readSensorData() {
+  Serial.println("---");
+  Serial.println("Leyendo datos del sensor para envio...");
+  TempAndHumidity  data = dhtSensor.getTempAndHumidity();
+  temperature = data.temperature;
+  humidity = data.humidity;
+  // -- Generación de Presión Atmosférica Aleatoria --
+  // Genera un número entero en el rango y luego lo convierte a flotante
+  pressure = random(PRESSURE_MIN_MEXICO_CITY, PRESSURE_MAX_MEXICO_CITY) / 100.0;
+  // Los sensores DHT a veces fallan. Es vital comprobar si la lectura es válida.
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Error: Fallo al leer del sensor DHT22. Revisa las conexiones.");
+    return;
+  }
+  Serial.println("Temp: " + String(data.temperature, 2) + "°C");
+  Serial.println("Humidity: " + String(data.humidity, 1) + "%");
+  Serial.println("Pressure: " + String(pressure, 1) + "hPa");
+  Serial.println("---");
+  sendDataToApi();
+}
+
 // Implementación de funciones auxiliares
 
 void setupWiFi() {
@@ -70,6 +137,39 @@ void setupWiFi() {
 
   Serial.println("\n¡WiFi conectado!");
   Serial.print("Dirección IP asignada: "); Serial.println(WiFi.localIP());
+}
+
+void sendDataToApi() {
+  if (WiFi.status() != WL_CONNECTED || isnan(temperature)) {
+    Serial.println("No se enviarán datos: Sin WiFi o existe lectura de sensor inválida.");
+    return;
+  }
+
+  JsonDocument doc;
+  
+  doc["timestamp"] = getFormattedTime();  
+  doc["location"] = cityLocation;
+  doc["sensorId"] = sensorId;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  doc["pressure"] = pressure;
+
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
+
+  HTTPClient http;
+  http.begin(apiEndpoint);
+  http.addHeader("Content-Type", "application/json");
+
+  Serial.println("Enviando JSON a la API: " + jsonPayload);
+  int httpResponseCode = http.POST(jsonPayload);
+
+  if (httpResponseCode > 0) {
+    Serial.print("Código de respuesta HTTP: "); Serial.println(httpResponseCode);
+  } else {
+    Serial.print("Error en la petición POST. Código: "); Serial.println(httpResponseCode);
+  }
+  http.end();
 }
 
 void syncTime() {
@@ -133,38 +233,4 @@ void handleUpdate() {
 void setupWebServer() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/update", HTTP_POST, handleUpdate);
-}
-
-void setup() {
-  Serial.begin(115200);
-  dhtSensor.setup(DHT_PIN, DHTesp::DHT22);
-  
-  setupWiFi();
-  syncTime();
-  setupWebServer();
-  server.begin();
-  Serial.println("Servidor web iniciado. Accede a http://" + WiFi.localIP().toString());
-}
-
-void loop() {
-  server.handleClient();
-
-  if (millis() - lastSendTime > SEND_INTERVAL_MS) {
-    lastSendTime = millis();
-    TempAndHumidity  data = dhtSensor.getTempAndHumidity();
-    temperature = data.temperature;
-    humidity = data.humidity;
-    // -- Generación de Presión Atmosférica Aleatoria --
-    // Genera un número entero en el rango y luego lo convierte a flotante
-    pressure = random(PRESSURE_MIN_MEXICO_CITY, PRESSURE_MAX_MEXICO_CITY) / 100.0;
-    // Los sensores DHT a veces fallan. Es vital comprobar si la lectura es válida.
-    if (isnan(humidity) || isnan(temperature)) {
-      Serial.println("Error: Fallo al leer del sensor DHT22. Revisa las conexiones.");
-      return;
-    }
-    Serial.println("Temp: " + String(data.temperature, 2) + "°C");
-    Serial.println("Humidity: " + String(data.humidity, 1) + "%");
-    Serial.println("Pressure: " + String(pressure, 1) + "hPa");
-    Serial.println("---");
-  }
 }
