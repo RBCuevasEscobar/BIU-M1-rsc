@@ -222,9 +222,9 @@ void handleUpdate() {
     Serial.println("Configuracion actualizada via web:");
     Serial.println("Nuevo ID: " + sensorId);
     Serial.println("Nueva Ubicacion: " + cityLocation);
-    server.send(200, "text/plain", "Configuracion actualizada. Redirigiendo...");
     // Redirige al usuario a la página principal después de 2 segundos
     server.sendHeader("Refresh", "2; url=/");
+    server.send(200, "text/plain", "Configuracion actualizada. Redirigiendo...");
   } else {
     server.send(400, "text/plain", "Error: Faltan argumentos.");
   }
