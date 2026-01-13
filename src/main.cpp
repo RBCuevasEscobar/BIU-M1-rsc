@@ -212,6 +212,7 @@ void handleRoot() {
   html += "<input type='submit' value='Actualizar'>";
   html += "</form>";
   html += "</body></html>";
+  server.sendHeader("Refresh", "30; url=/");
   server.send(200, "text/html", html);
 }
 
