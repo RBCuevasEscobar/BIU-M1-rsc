@@ -201,6 +201,7 @@ void handleRoot() {
   html += "<h2>Ubicacion: " + cityLocation + "</h2>";
   html += "<hr>";
   html += "<h2>Lecturas Actuales</h2>";
+  html += "<p class='data'><b>Fecha/Hora:</b> " + getFormattedTime() + "</p>";
   html += "<p class='data'><b>Temperatura:</b> " + String(temperature) + " &deg;C</p>";
   html += "<p class='data'><b>Humedad:</b> " + String(humidity) + " %</p>";
   html += "<p class='data'><b>Presion:</b> " + String(pressure) + " hPa</p>";
