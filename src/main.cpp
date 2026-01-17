@@ -30,7 +30,7 @@ String sensorId = "sensor-222";      // ID único del sensor
 
 // 5. Configuración del sensor y simulación
 
-const int DHT_PIN = 15;
+const int DHT_PIN = 15; // Pin GPIO donde está conectado el DHT22 sensor-222
 
 // Rango de presión atmosférica para la Ciudad de México (a ~2240m de altitud)
 // La presión normal es ~780 hPa. Usaremos un rango realista para la simulación.
@@ -44,7 +44,7 @@ const int   daylightOffset_sec = 3600; // Horario de verano
 #define     SEND_INTERVAL_MS 60000 // 60 segundos
 // -------------------------------------------------------------------------
 
-DHTesp dhtSensor;
+DHTesp dhtSensor; // Objeto del sensor DHT22 sensor-222
 WebServer server(80);
 unsigned long lastSendTime = 0;
 
@@ -65,7 +65,7 @@ void setup() {
   Serial.begin(115200);
   delay(10);
   Serial.println("Iniciando Estacion Meteorologica ESP32 (Ciudad de Mexico)...");
-  dhtSensor.setup(DHT_PIN, DHTesp::DHT22);
+  dhtSensor.setup(DHT_PIN, DHTesp::DHT22);  // Inicializa el sensor DHT22 sensor-222
 
   Serial.println("Sensor DHT22 inicializado.");
   
@@ -99,7 +99,7 @@ void loop() {
 void readSensorData() {
   Serial.println("---");
   Serial.println("Leyendo datos del sensor para envio...");
-  TempAndHumidity  data = dhtSensor.getTempAndHumidity();
+  TempAndHumidity  data = dhtSensor.getTempAndHumidity();   // Obtiene temperatura y humedad sensor-222
   temperature = data.temperature;
   humidity = data.humidity;
   // -- Generación de Presión Atmosférica Aleatoria --
@@ -118,6 +118,8 @@ void readSensorData() {
 }
 
 // Implementación de funciones auxiliares
+
+// Configura y conecta el device IoT a la red WiFi 
 
 void setupWiFi() {
   Serial.println("Configurando WiFi...");
@@ -138,6 +140,8 @@ void setupWiFi() {
   Serial.println("\n¡WiFi conectado!");
   Serial.print("Dirección IP asignada: "); Serial.println(WiFi.localIP());
 }
+
+// Envía los datos del sensor en formato JSON a la API RESTful en MS Azure Cloud para registro de variables de clima 
 
 void sendDataToApi() {
   if (WiFi.status() != WL_CONNECTED || isnan(temperature)) {
@@ -172,6 +176,8 @@ void sendDataToApi() {
   http.end();
 }
 
+// Sincroniza la hora del dispositivo con un servidor NTP
+
 void syncTime() {
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   Serial.print("Sincronizando hora...");
@@ -183,6 +189,8 @@ void syncTime() {
   Serial.println(" Hora sincronizada.");
 }
 
+// Obtiene la hora formateada como cadena ISO 8601 YYYY-MM-DDTHH:MM:SS
+
 String getFormattedTime() {
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
@@ -192,6 +200,8 @@ String getFormattedTime() {
   strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%dT%H:%M:%S", &timeinfo);
   return String(timeStringBuff);
 }
+
+// Configura el servidor web y la ruta para el portal principal en el SoC ESP32 para visualizacion de variables de clima
 
 void handleRoot() {
   String html = "<html><head><title>Estacion Meteorologica ESP32</title>";
@@ -217,6 +227,8 @@ void handleRoot() {
   server.send(200, "text/html", html);
 }
 
+// Maneja la actualización de la configuración de sensores adicionales en el dispositivo IoT via formulario web
+
 void handleUpdate() {
   if (server.hasArg("sensorId") && server.hasArg("location")) {
     sensorId = server.arg("sensorId");
@@ -231,6 +243,8 @@ void handleUpdate() {
     server.send(400, "text/plain", "Error: Faltan argumentos.");
   }
 }
+
+// Configura las rutas del portal para el servidor web en el SoC ESP32
 
 void setupWebServer() {
   server.on("/", HTTP_GET, handleRoot);
